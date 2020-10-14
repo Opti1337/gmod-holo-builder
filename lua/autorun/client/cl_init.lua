@@ -1,5 +1,9 @@
 include "vgui/editor.lua"
 
+if not file.Exists("koptilnya_holo_builder", "DATA") then
+    file.CreateDir("koptilnya_holo_builder")
+end
+
 language.Add("tool.koptilnya_holo_builder.name", "Holo Builder")
 language.Add("tool.koptilnya_holo_builder.desc", "Build anything with holograms")
 language.Add("tool.koptilnya_holo_builder.left_spawn",

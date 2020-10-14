@@ -56,29 +56,54 @@ function PANEL:InitMenuBar()
 
     -- Project
     local fileMenu = menuBar:AddMenu("Project")
-    fileMenu:AddOption("New")
-    fileMenu:AddOption("Open")
+    fileMenu:AddOption("New..."):SetIcon("icon16/page_add.png")
+    fileMenu:AddOption("Save...", function()
+        Derma_StringRequest("Save project...", "Enter project name", "",
+                            function(text)
+            file.Write(string.format("koptilnya_holo_builder/%s.json", text),
+                       "Чел, ты...")
+        end)
+    end):SetIcon("icon16/page_save.png")
+    fileMenu:AddOption("Open...", function()
+        local frame = vgui.Create("DFrame")
+        frame:SetTitle("Open project...")
+        frame:SetSize(300, 500)
+        frame:Center()
+        frame:MakePopup()
+        frame:SetBackgroundBlur(true)
+
+        local tree = vgui.Create("DTree", frame)
+        tree:Dock(FILL)
+        tree.DoClick = function(tree, node)
+            self:OpenProject(node:GetFileName())
+            frame:Close()
+        end
+
+        local projectsNode = tree:AddNode("Projects")
+        projectsNode:MakeFolder("koptilnya_holo_builder", "DATA", true,
+                                "*.json", false)
+        projectsNode:SetExpanded(true)
+    end):SetIcon("icon16/page_edit.png")
 
     fileMenu:AddSpacer()
 
     local exportSubMenu = fileMenu:AddSubMenu("Export")
     exportSubMenu:SetDeleteSelf(false)
-    exportSubMenu:AddOption("To E2 holograms")
+    exportSubMenu:AddOption("To E2 holograms"):SetIcon("icon16/page_go.png")
 
     fileMenu:AddSpacer()
 
-    fileMenu:AddOption("Exit", function()
-        self:Close()
-    end)
+    fileMenu:AddOption("Exit", function() self:Close() end):SetIcon(
+        "icon16/door_open.png")
 
     -- Create
     local createMenu = menuBar:AddMenu("Create")
-    createMenu:AddOption("Cube", function() 
+    createMenu:AddOption("Cube", function()
         -- net.Start("koptilnya_holo_builder_create_holo")
         -- net.WriteString("models/holograms/cube.mdl")
         -- net.SendToServer()
     end)
-    createMenu:AddOption("Cylinder", function() 
+    createMenu:AddOption("Cylinder", function()
         -- net.Start("koptilnya_holo_builder_create_holo")
         -- net.WriteEntity(self.controller)
         -- net.WriteString("models/holograms/hq_cylinder.mdl")
@@ -100,5 +125,16 @@ function PANEL:SetController(controller)
     controller:CallOnRemove("remove_holo_builder", function() self:Close() end)
 end
 
+function PANEL:OpenProject(projectPath)
+    local project = util.JSONToTable(file.Read(projectPath))
+
+    if project then
+        self.projectPath = projectPath
+        self.project = project
+    else
+        notification.AddLegacy("Project is broken!", NOTIFY_ERROR, 3)
+        surface.PlaySound("buttons/button10.wav")
+    end
+end
 
 vgui.Register("koptilnya_holo_builder_editor", PANEL, "DFrame")
