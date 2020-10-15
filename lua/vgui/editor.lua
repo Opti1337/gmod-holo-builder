@@ -1,7 +1,13 @@
 local scrW, scrH = ScrW(), ScrH()
 local ply = LocalPlayer()
+local projectLib = koptilnya_holo_builder_cl_lib.Project
+local netLib = koptilnya_holo_builder_sh_lib.Net
 
 local PANEL = {}
+
+PANEL.projectName = nil
+PANEL.project = nil
+PANEL.selectedHologram = nil
 
 function PANEL:Init()
     local width, height = 400, 500
@@ -54,54 +60,76 @@ function PANEL:InitMenuBar()
     local menuBar = vgui.Create("DMenuBar", self)
     menuBar:DockMargin(-3, -6, -3, 6)
 
-    -- Project
+    -- Project menu
     local fileMenu = menuBar:AddMenu("Project")
     fileMenu:AddOption("New..."):SetIcon("icon16/page_add.png")
     fileMenu:AddOption("Save...", function()
-        Derma_StringRequest("Save project...", "Enter project name", "",
-                            function(text)
-            file.Write(string.format("koptilnya_holo_builder/%s.json", text),
-                       "Чел, ты...")
+        Derma_StringRequest("Save project...", "Enter project name", self.projectName or "", function(projectName)
+            projectLib.SaveProject(projectName, {[1] = {model = "models/holograms/hq_sphere.mdl"}})
         end)
     end):SetIcon("icon16/page_save.png")
     fileMenu:AddOption("Open...", function()
         local frame = vgui.Create("DFrame")
         frame:SetTitle("Open project...")
-        frame:SetSize(300, 500)
+        frame:SetSize(300, 400)
         frame:Center()
         frame:MakePopup()
         frame:SetBackgroundBlur(true)
 
-        local tree = vgui.Create("DTree", frame)
-        tree:Dock(FILL)
-        tree.DoClick = function(tree, node)
-            self:OpenProject(node:GetFileName())
+        local projectList = vgui.Create("DListView", frame)
+        projectList:Dock(FILL)
+        projectList:SetMultiSelect(false)
+        projectList:AddColumn("Projects")
+        projectList.DoDoubleClick = function(list, index, line)
+            local projectName = line:GetColumnText(1)
+            local project = projectLib.GetProject(projectName)
+
+            if project ~= nil then
+                self.projectName = projectName
+                self.project = project
+            end
+
             frame:Close()
         end
 
-        local projectsNode = tree:AddNode("Projects")
-        projectsNode:MakeFolder("koptilnya_holo_builder", "DATA", true,
-                                "*.json", false)
-        projectsNode:SetExpanded(true)
+        for i, v in ipairs(projectLib.GetProjects(true)) do
+            projectList:AddLine(v)
+        end
     end):SetIcon("icon16/page_edit.png")
 
     fileMenu:AddSpacer()
 
     local exportSubMenu = fileMenu:AddSubMenu("Export")
     exportSubMenu:SetDeleteSelf(false)
-    exportSubMenu:AddOption("To E2 holograms"):SetIcon("icon16/page_go.png")
+    exportSubMenu:AddOption("To Expression 2"):SetIcon("icon16/page_go.png")
 
     fileMenu:AddSpacer()
 
-    fileMenu:AddOption("Exit", function() self:Close() end):SetIcon(
-        "icon16/door_open.png")
+    fileMenu:AddOption("Exit", function()
+        self:Close()
+    end):SetIcon("icon16/door_open.png")
 
-    -- Create
+    -- Create menu
     local createMenu = menuBar:AddMenu("Create")
     createMenu:AddOption("Cube", function()
-        -- net.Start("koptilnya_holo_builder_create_holo")
-        -- net.WriteString("models/holograms/cube.mdl")
-        -- net.SendToServer()
+        local holo = {
+            "models/holograms/cube.mdl",
+            tostring(self.controller:GetPos()),
+            tostring(Angle(0, 0, 0)),
+            tostring(Vector(1, 1, 1)),
+            tostring(Color(255, 255, 255))
+        }
+
+        PrintTable(holo)
+
+        local json = util.TableToJSON(holo)
+        local compressedJson = util.Compress(json)
+
+        net.Start(netLib.NetworkMessageName("create_holo"))
+        net.WriteEntity(self.controller)
+        net.WriteUInt(#compressedJson, 12)
+        net.WriteData(compressedJson, #compressedJson)
+        net.SendToServer()
     end)
     createMenu:AddOption("Cylinder", function()
         -- net.Start("koptilnya_holo_builder_create_holo")
@@ -118,11 +146,15 @@ function PANEL:OnClose()
 end
 
 function PANEL:SetController(controller)
-    if controller:GetClass() ~= "koptilnya_holo_builder" then return end
+    if controller:GetClass() ~= "koptilnya_holo_builder" then
+        return
+    end
 
     self.controller = controller
 
-    controller:CallOnRemove("remove_holo_builder", function() self:Close() end)
+    controller:CallOnRemove("remove_holo_builder", function()
+        self:Close()
+    end)
 end
 
 function PANEL:OpenProject(projectPath)

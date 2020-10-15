@@ -40,16 +40,22 @@ elseif CLIENT then
     net.Receive("koptilnya_holo_builder_open_editor", function()
         local controller = net.ReadEntity()
 
-        if controller:GetClass() ~= "koptilnya_holo_builder" then return end
+        if controller:GetClass() ~= "koptilnya_holo_builder" then
+            return
+        end
 
-        if IsValid(koptilnya_holo_builder_editor) then koptilnya_holo_builder_editor:Close() end
+        if IsValid(koptilnya_holo_builder_editor) then
+            koptilnya_holo_builder_editor:Close()
+        end
 
         koptilnya_holo_builder_editor = vgui.Create("koptilnya_holo_builder_editor")
         koptilnya_holo_builder_editor:SetController(controller)
     end)
 
     concommand.Add("koptilnya_holo_builder_toggle", function()
-        if IsValid(koptilnya_holo_builder_editor) then koptilnya_holo_builder_editor:ToggleVisible() end
+        if IsValid(koptilnya_holo_builder_editor) then
+            koptilnya_holo_builder_editor:ToggleVisible()
+        end
     end)
 
 end

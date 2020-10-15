@@ -1,14 +1,9 @@
-include "vgui/editor.lua"
+include("includes/language.lua")
+include("includes/cl_lib.lua")
+include("vgui/editor.lua")
 
-if not file.Exists("koptilnya_holo_builder", "DATA") then
-    file.CreateDir("koptilnya_holo_builder")
+local projectLib = koptilnya_holo_builder_cl_lib.Project
+
+if not file.Exists(projectLib.PROJECTS_FOLDER, "DATA") then
+    file.CreateDir(projectLib.Project.PROJECTS_FOLDER)
 end
-
-language.Add("tool.koptilnya_holo_builder.name", "Holo Builder")
-language.Add("tool.koptilnya_holo_builder.desc", "Build anything with holograms")
-language.Add("tool.koptilnya_holo_builder.left_spawn",
-             "Left click to spawn a controller")
-language.Add("Undone_koptilnya_holo_builder", "Undone Holo Builder")
-language.Add("Undone_Holo Builder", "Undone Holo Builder")
-language.Add("Cleanup_koptilnya_holo_builder", "Holo Builder")
-language.Add("Cleaned_koptilnya_holo_builder", "Cleaned Holo Builders")

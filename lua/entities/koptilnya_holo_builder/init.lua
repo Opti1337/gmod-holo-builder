@@ -3,6 +3,8 @@ AddCSLuaFile("shared.lua")
 
 include("shared.lua")
 
+local netLib = koptilnya_holo_builder_sh_lib.Net
+
 function ENT:Initialize()
     self:SetModel("models/cheeze/beta/white_button.mdl")
     self:DrawShadow(false)
@@ -10,13 +12,14 @@ function ENT:Initialize()
     self:SetSolid(SOLID_VPHYSICS)
 end
 
-util.AddNetworkString("koptilnya_holo_builder_create_holo")
+util.AddNetworkString(netLib.NetworkMessageName("create_holo"))
 
-net.Receive("koptilnya_holo_builder_create_holo", function(len, ply)
+net.Receive(netLib.NetworkMessageName("create_holo"), function(len, ply)
     local controller = net.ReadEntity()
-    local model = net.ReadString()
+    local size = net.ReadUInt(12)
+    local compressedJson = net.ReadData(size)
+    local json = util.Decompress(compressedJson)
+    local holo = util.JSONToTable(json)
 
-    controller:SetHologramsData(controller:GetHologramsData() .. ", " .. model)
-    
-    print(controller:GetHologramsData())
+    PrintTable(holo)
 end)
