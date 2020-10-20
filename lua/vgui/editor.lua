@@ -1,13 +1,32 @@
 local scrW, scrH = ScrW(), ScrH()
 local ply = LocalPlayer()
 local projectLib = koptilnya_holo_builder_cl_lib.Project
+local ShowError = koptilnya_holo_builder_cl_lib.ShowError
 local netLib = koptilnya_holo_builder_sh_lib.Net
+local IsValidKHB = koptilnya_holo_builder_sh_lib.IsValidKHB
 
 local PANEL = {}
 
-PANEL.projectName = nil
-PANEL.project = nil
-PANEL.selectedHologram = nil
+PANEL.Holograms = {}
+PANEL.ProjectName = nil
+PANEL.Project = nil
+PANEL.SelectedHologram = nil
+
+local function SendCreateHologram(controller, model)
+    local serializedHolo = netLib.SerializeHologram({
+        model = model,
+        position = controller:GetPos(),
+        angle = Angle(0, 0, 0),
+        scale = Vector(1, 1, 1),
+        color = Color(255, 255, 255)
+    })
+
+    net.Start(netLib.NetworkMessageName("create_holo"))
+    net.WriteEntity(controller)
+    net.WriteUInt(#serializedHolo, 12)
+    net.WriteData(serializedHolo, #serializedHolo)
+    net.SendToServer()
+end
 
 function PANEL:Init()
     local width, height = 400, 500
@@ -46,14 +65,7 @@ function PANEL:Init()
     local visualsTab = vgui.Create("DPanel", tabs)
     tabs:AddSheet("Visuals", visualsTab)
 
-    self.holoList = vgui.Create("DListView", self)
-    self.holoList:Dock(BOTTOM)
-    self.holoList:DockMargin(0, 3, 0, 0)
-    self.holoList:SetMultiSelect(false)
-    self.holoList:SetHeight(100)
-
-    self.holoList:AddColumn("ID"):SetFixedWidth(30)
-    self.holoList:AddColumn("Name")
+    self:InitHologramList()
 end
 
 function PANEL:InitMenuBar()
@@ -64,7 +76,7 @@ function PANEL:InitMenuBar()
     local fileMenu = menuBar:AddMenu("Project")
     fileMenu:AddOption("New..."):SetIcon("icon16/page_add.png")
     fileMenu:AddOption("Save...", function()
-        Derma_StringRequest("Save project...", "Enter project name", self.projectName or "", function(projectName)
+        Derma_StringRequest("Save project...", "Enter project name", self.ProjectName or "", function(projectName)
             projectLib.SaveProject(projectName, {[1] = {model = "models/holograms/hq_sphere.mdl"}})
         end)
     end):SetIcon("icon16/page_save.png")
@@ -82,13 +94,8 @@ function PANEL:InitMenuBar()
         projectList:AddColumn("Projects")
         projectList.DoDoubleClick = function(list, index, line)
             local projectName = line:GetColumnText(1)
-            local project = projectLib.GetProject(projectName)
 
-            if project ~= nil then
-                self.projectName = projectName
-                self.project = project
-            end
-
+            self:OpenProject(projectName)
             frame:Close()
         end
 
@@ -111,61 +118,82 @@ function PANEL:InitMenuBar()
 
     -- Create menu
     local createMenu = menuBar:AddMenu("Create")
-    createMenu:AddOption("Cube", function()
-        local holo = {
-            "models/holograms/cube.mdl",
-            tostring(self.controller:GetPos()),
-            tostring(Angle(0, 0, 0)),
-            tostring(Vector(1, 1, 1)),
-            tostring(Color(255, 255, 255))
-        }
+    local models = {Cube = "models/holograms/cube.mdl", Cylinder = "models/holograms/hq_cylinder.mdl"}
 
-        PrintTable(holo)
-
-        local json = util.TableToJSON(holo)
-        local compressedJson = util.Compress(json)
-
-        net.Start(netLib.NetworkMessageName("create_holo"))
-        net.WriteEntity(self.controller)
-        net.WriteUInt(#compressedJson, 12)
-        net.WriteData(compressedJson, #compressedJson)
-        net.SendToServer()
+    createMenu:AddOption("Custom...", function()
+        Derma_StringRequest("Create custom hologram...", "Enter model path", "", function(modelPath)
+            if modelPath ~= "" then
+                SendCreateHologram(self.Controller, modelPath)
+            end
+        end)
     end)
-    createMenu:AddOption("Cylinder", function()
-        -- net.Start("koptilnya_holo_builder_create_holo")
-        -- net.WriteEntity(self.controller)
-        -- net.WriteString("models/holograms/hq_cylinder.mdl")
-        -- net.SendToServer()
-    end)
+
+    for k, v in pairs(models) do
+        createMenu:AddOption(k, function()
+            SendCreateHologram(self.Controller, v)
+        end)
+    end
+end
+
+function PANEL:InitHologramList()
+    self.HologramList = vgui.Create("DListView", self)
+    self.HologramList:Dock(BOTTOM)
+    self.HologramList:DockMargin(0, 3, 0, 0)
+    self.HologramList:SetMultiSelect(false)
+    self.HologramList:SetHeight(100)
+
+    self.HologramList:AddColumn("ID"):SetFixedWidth(30)
+    self.HologramList:AddColumn("Name")
+end
+
+function PANEL:PopulateHologramList()
+    self.HologramList:Clear()
+
+    if not self.Controller then
+        return
+    end
+
+    for k, v in pairs(self.Controller.Holograms) do
+        self.HologramList:AddLine(v.index, v.name == "" and v.model or v.name)
+    end
 end
 
 function PANEL:OnClose()
-    if IsValid(self.controller) then
-        self.controller:RemoveCallOnRemove("remove_holo_builder")
+    if IsValid(self.Controller) then
+        self.Controller:RemoveCallOnRemove("remove_holo_builder")
     end
 end
 
 function PANEL:SetController(controller)
-    if controller:GetClass() ~= "koptilnya_holo_builder" then
+    if not IsValidKHB(controller) then
         return
     end
 
-    self.controller = controller
+    self.Controller = controller
 
     controller:CallOnRemove("remove_holo_builder", function()
         self:Close()
     end)
+
+    controller:CallOnProjectOpened("holobuilder_update", function()
+        self:PopulateHologramList()
+    end)
+
+    controller:CallOnHologramCreated("holobuilder_update", function()
+        self:PopulateHologramList()
+    end)
+
+    self:PopulateHologramList()
 end
 
-function PANEL:OpenProject(projectPath)
-    local project = util.JSONToTable(file.Read(projectPath))
+function PANEL:OpenProject(projectName)
+    local project = projectLib.GetProject(projectName)
 
     if project then
-        self.projectPath = projectPath
-        self.project = project
+        self.ProjectName = projectName
+        self.Controller:OpenProject(projectName, project)
     else
-        notification.AddLegacy("Project is broken!", NOTIFY_ERROR, 3)
-        surface.PlaySound("buttons/button10.wav")
+        ShowError("Project is broken!")
     end
 end
 

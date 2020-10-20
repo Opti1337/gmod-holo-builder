@@ -21,7 +21,7 @@ lib.Project = {
             return util.JSONToTable(json)
         end
 
-        return nil
+        return false
     end,
     SaveProject = function(projectName, data)
         projectName = string.StripExtension(projectName)
@@ -45,6 +45,13 @@ lib.Project = {
         return files
     end
 }
+
+lib.ShowError = function(text, duration)
+    duration = duration or 3
+    
+    notification.AddLegacy(text, NOTIFY_ERROR, duration)
+    surface.PlaySound("buttons/button10.wav")
+end
 
 lib.Net = {
     MESSAGE_NAME_PREFIX = "koptilnya_holo_builder_",
