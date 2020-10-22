@@ -22,7 +22,7 @@ function ENT:OpenProject(projectName, project)
 
     net.Start(netLib.NetworkMessageName("open_project"))
     net.WriteEntity(self)
-    net.WriteUInt(#serializedProject, 12)
+    net.WriteUInt(#serializedProject, 16)
     net.WriteData(serializedProject, #serializedProject)
     net.SendToServer()
 end
